@@ -93,17 +93,18 @@ public class TodoController implements Controller {
    * @param ctx a Javalin HTTP context
    */
   public void getTodos(Context ctx) {
-    //Bson combinedFilter = constructFilter(ctx);
+    Bson combinedFilter = constructFilter(ctx);
     //Bson sortingOrder = constructSortingOrder(ctx);
 
     // All three of the find, sort, and into steps happen "in parallel" inside the
     // database system. So MongoDB is going to find the users with the specified
     // properties, return those sorted in the specified manner, and put the
     // results into an initially empty ArrayList.
-    ArrayList<Todo> matchingTodos = ((MongoIterable<Todo>) todosCollection)
-      //.find(combinedFilter)
+    ArrayList<Todo> matchingTodos = todosCollection
+      .find(combinedFilter)
       //.sort(sortingOrder)
       .into(new ArrayList<>());
+
 
     // Set the JSON body of the response to be the list of users returned by the database.
     // According to the Javalin documentation (https://javalin.io/documentation#context),
@@ -114,6 +115,46 @@ public class TodoController implements Controller {
     ctx.status(HttpStatus.OK);
   }
 
+  /**
+   * Construct a Bson filter document to use in the `find` method based on the
+   * query parameters from the context.
+   *
+   * This checks for the presence of the `age`, `company`, and `role` query
+   * parameters and constructs a filter document that will match users with
+   * the specified values for those fields.
+   *
+   * @param ctx a Javalin HTTP context, which contains the query parameters
+   *    used to construct the filter
+   * @return a Bson filter document that can be used in the `find` method
+   *   to filter the database collection of users
+   */
+  private Bson constructFilter(Context ctx) {
+    List<Bson> filters = new ArrayList<>(); // start with an empty list of filters
+    /*
+    if (ctx.queryParamMap().containsKey(AGE_KEY)) {
+      int targetAge = ctx.queryParamAsClass(AGE_KEY, Integer.class)
+        .check(it -> it > 0, "User's age must be greater than zero; you provided " + ctx.queryParam(AGE_KEY))
+        .check(it -> it < REASONABLE_AGE_LIMIT,
+          "User's age must be less than " + REASONABLE_AGE_LIMIT + "; you provided " + ctx.queryParam(AGE_KEY))
+        .get();
+      filters.add(eq(AGE_KEY, targetAge));
+    }
+    if (ctx.queryParamMap().containsKey(COMPANY_KEY)) {
+      Pattern pattern = Pattern.compile(Pattern.quote(ctx.queryParam(COMPANY_KEY)), Pattern.CASE_INSENSITIVE);
+      filters.add(regex(COMPANY_KEY, pattern));
+    }
+    if (ctx.queryParamMap().containsKey(ROLE_KEY)) {
+      String role = ctx.queryParamAsClass(ROLE_KEY, String.class)
+        .check(it -> it.matches(ROLE_REGEX), "User must have a legal user role")
+        .get();
+      filters.add(eq(ROLE_KEY, role));
+    }
+  */
+    // Combine the list of filters into a single filtering document.
+    Bson combinedFilter = filters.isEmpty() ? new Document() : and(filters);
+
+    return combinedFilter;
+  }
 
   /**
    * Utility function to generate the md5 hash for a given string
