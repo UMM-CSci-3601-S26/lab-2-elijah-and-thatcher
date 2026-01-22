@@ -4,12 +4,12 @@ import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Filters.regex;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+//import java.nio.charset.StandardCharsets;
+//import java.security.MessageDigest;
+//import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+//import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -20,9 +20,9 @@ import org.bson.types.ObjectId;
 import org.mongojack.JacksonMongoCollection;
 
 import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.MongoIterable;
+//import com.mongodb.client.MongoIterable;
 import com.mongodb.client.model.Sorts;
-import com.mongodb.client.result.DeleteResult;
+//import com.mongodb.client.result.DeleteResult;
 
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
@@ -42,7 +42,7 @@ public class TodoController implements Controller {
   static final String STATUS_KEY = "status";
   static final String BODY_KEY = "body";
   static final String CATEGORY_KEY = "category";
-  static final String SORT_ORDER_KEY = "sortorder";
+  //static final String SORT_ORDER_KEY = "sortorder";
 
   /*private static final int REASONABLE_AGE_LIMIT = 150;
   private static final String ROLE_REGEX = "^(admin|editor|viewer)$";
@@ -130,24 +130,16 @@ public class TodoController implements Controller {
    */
   private Bson constructFilter(Context ctx) {
     List<Bson> filters = new ArrayList<>(); // start with an empty list of filters
-    /*
-    if (ctx.queryParamMap().containsKey(AGE_KEY)) {
-      int targetAge = ctx.queryParamAsClass(AGE_KEY, Integer.class)
-        .check(it -> it > 0, "User's age must be greater than zero; you provided " + ctx.queryParam(AGE_KEY))
-        .check(it -> it < REASONABLE_AGE_LIMIT,
-          "User's age must be less than " + REASONABLE_AGE_LIMIT + "; you provided " + ctx.queryParam(AGE_KEY))
-        .get();
-      filters.add(eq(AGE_KEY, targetAge));
+
+    if (ctx.queryParamMap().containsKey(OWNER_KEY)) {
+      Pattern pattern = Pattern.compile(Pattern.quote(ctx.queryParam(OWNER_KEY)), Pattern.CASE_INSENSITIVE);
+      filters.add(regex(OWNER_KEY, pattern));
     }
-    if (ctx.queryParamMap().containsKey(COMPANY_KEY)) {
-      Pattern pattern = Pattern.compile(Pattern.quote(ctx.queryParam(COMPANY_KEY)), Pattern.CASE_INSENSITIVE);
-      filters.add(regex(COMPANY_KEY, pattern));
-    }
-    if (ctx.queryParamMap().containsKey(ROLE_KEY)) {
-      String role = ctx.queryParamAsClass(ROLE_KEY, String.class)
-        .check(it -> it.matches(ROLE_REGEX), "User must have a legal user role")
+   /* if (ctx.queryParamMap().containsKey(STATUS_KEY)) {
+      String status = ctx.queryParamAsClass(STATUS_KEY, String.class)
+        .check(it -> it.matches(STATUS_KEY), "User must have a status")
         .get();
-      filters.add(eq(ROLE_KEY, role));
+      filters.add(eq(STATUS_KEY, status));
     }
   */
     // Combine the list of filters into a single filtering document.
@@ -156,20 +148,29 @@ public class TodoController implements Controller {
     return combinedFilter;
   }
 
-  /**
-   * Utility function to generate the md5 hash for a given string
+   /**
+   * Construct a Bson sorting document to use in the `sort` method based on the
+   * query parameters from the context.
    *
-   * @param str the string to generate a md5 for
+   * This checks for the presence of the `sortby` and `sortorder` query
+   * parameters and constructs a sorting document that will sort users by
+   * the specified field in the specified order. If the `sortby` query
+   * parameter is not present, it defaults to "name". If the `sortorder`
+   * query parameter is not present, it defaults to "asc".
+   *
+   * @param ctx a Javalin HTTP context, which contains the query parameters
+   *   used to construct the sorting order
+   * @return a Bson sorting document that can be used in the `sort` method
+   *  to sort the database collection of users
    */
-  public String md5(String str) throws NoSuchAlgorithmException {
-    MessageDigest md = MessageDigest.getInstance("MD5");
-    byte[] hashInBytes = md.digest(str.toLowerCase().getBytes(StandardCharsets.UTF_8));
-
-    StringBuilder result = new StringBuilder();
-    for (byte b : hashInBytes) {
-      result.append(String.format("%02x", b));
-    }
-    return result.toString();
+  private Bson constructSortingOrder(Context ctx) {
+    // Sort the results. Use the `sortby` query param (default "name")
+    // as the field to sort by, and the query param `sortorder` (default
+    // "asc") to specify the sort order.
+    String sortBy = Objects.requireNonNullElse(ctx.queryParam("sortby"), "name");
+    String sortOrder = Objects.requireNonNullElse(ctx.queryParam("sortorder"), "asc");
+    Bson sortingOrder = sortOrder.equals("desc") ?  Sorts.descending(sortBy) : Sorts.ascending(sortBy);
+    return sortingOrder;
   }
 
   /**
@@ -207,6 +208,8 @@ public class TodoController implements Controller {
 
     // List users, filtered using query parameters
     server.get(API_TODOS, this::getTodos);
+
+    //server.get("/api/todosByOwner", this::getTodosGroupedByOwner);
 
     // Add new user with the user info being in the JSON body
     // of the HTTP request
