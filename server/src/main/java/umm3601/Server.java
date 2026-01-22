@@ -117,6 +117,7 @@ public class Server {
       config.bundledPlugins.enableRouteOverview("/api")
     );
 
+
     // Configure the MongoDB client and the Javalin server to shut down gracefully.
     configureShutdowns(server);
 
