@@ -4,5 +4,5 @@ package umm3601.todo;
 public class TodoIdOwner {
   @SuppressWarnings("checkstyle:membername")
   public String _id;
-  public String name;
+  public String owner;
 }
