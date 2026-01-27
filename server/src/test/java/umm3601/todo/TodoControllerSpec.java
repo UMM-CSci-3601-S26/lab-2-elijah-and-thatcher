@@ -222,7 +222,7 @@ class TodoControllerSpec {
   }
 
   /**
-   * Confirm that if we process a request for todos with status true,
+   * Confirm that if we process a request for todos with status false,
    * that all returned todos have that status, and we get the correct
    * number of todos.
    *
@@ -230,7 +230,7 @@ class TodoControllerSpec {
    */
 
   @Test
-  void canGetTodosWithStatusTrue() throws IOException {
+  void canGetTodosWithStatusFalse() throws IOException {
     // We'll need both `String` and `Boolean` representations of
     // the target status
     Boolean targetStatus = false;
@@ -249,7 +249,7 @@ class TodoControllerSpec {
     when(ctx.queryParam(TodoController.STATUS_KEY)).thenReturn(targetStatusString);
 
     // Create a validator that confirms that when we ask for the value associated with
-    // `STATUS_KEY` _as an boolean_, we get back the integer value true.
+    // `STATUS_KEY` _as an boolean_, we get back the boolean value true.
     Validation validation = new Validation();
     // The `STATUS_KEY` should be name of the key whose value is being validated.
     Validator<Boolean> validator = validation.validator(TodoController.STATUS_KEY, Boolean.class, targetStatusString);
@@ -276,13 +276,88 @@ class TodoControllerSpec {
     List<String> owners = todoArrayListCaptor.getValue().stream().map(todo -> todo.owner).collect(Collectors.toList());
     // Confirm that the returned `owners` contain the two names of the true todos
     assertTrue(owners.contains("Pat"));
+    assertTrue(owners.contains("Jamie"));
+  }
+
+  /**
+   * Confirm that if we process a request for todos with status true,
+   * that all returned todos have that status, and we get the correct
+   * number of todos.
+   *
+   * @throws IOException
+   */
+
+  @Test
+  void canGetTodosWithStatusTrue() throws IOException {
+    // We'll need both `String` and `Boolean` representations of
+    // the target status
+    Boolean targetStatus = true;
+    String targetStatusString = "complete";
+
+    // Create a `Map` for the `queryParams` that will "return" the string
+    // "true" if you ask for the value associated with the `STATUS_KEY`.
+    Map<String, List<String>> queryParams = new HashMap<>();
+
+    queryParams.put(TodoController.STATUS_KEY, Arrays.asList(new String[] {targetStatusString}));
+    // When the code being tested calls `ctx.queryParamMap()` return the
+    // the `queryParams` map we just built.
+    when(ctx.queryParamMap()).thenReturn(queryParams);
+    // When the code being tested calls `ctx.queryParam(STATUS_KEY)` return the
+    // `targetStatusString`.
+    when(ctx.queryParam(TodoController.STATUS_KEY)).thenReturn(targetStatusString);
+
+    // Create a validator that confirms that when we ask for the value associated with
+    // `STATUS_KEY` _as an boolean_, we get back the boolean value true.
+    Validation validation = new Validation();
+    // The `STATUS_KEY` should be name of the key whose value is being validated.
+    Validator<Boolean> validator = validation.validator(TodoController.STATUS_KEY, Boolean.class, targetStatusString);
+    // When the code being tested calls `ctx.queryParamAsClass("status", Boolean.class)`
+    // we'll return the `Validator` we just constructed.
+    when(ctx.queryParamAsClass(TodoController.STATUS_KEY, Boolean.class))
+        .thenReturn(validator);
+
+    todoController.getTodos(ctx);
+
+    // Confirm that the code being tested calls `ctx.json(…)`, and capture whatever
+    // is passed in as the argument when `ctx.json()` is called.
+    verify(ctx).json(todoArrayListCaptor.capture());
+    // Confirm that the code under test calls `ctx.status(HttpStatus.OK)` is called.
+    verify(ctx).status(HttpStatus.OK);
+
+    // Confirm that we get back three todos.
+    assertEquals(3, todoArrayListCaptor.getValue().size());
+    // Confirm that both todos have status true.
+    for (Todo todo : todoArrayListCaptor.getValue()) {
+      assertEquals(targetStatus, todo.status);
+    }
+    // Generate a list of the owners of the returned todos.
+    List<String> owners = todoArrayListCaptor.getValue().stream().map(todo -> todo.owner).collect(Collectors.toList());
+    // Confirm that the returned `owners` contain the two names of the true todos
+    assertTrue(owners.contains("Chris"));
+    assertTrue(owners.contains("Sam"));
+  }
+
+
+  // Make sure the correct error is thrown for invalid status values
+  @Test
+  void getTodoWithBadStatus() throws IOException {
+    String invalidStatus = "bad";
+    Map<String, List<String>> queryParams = new HashMap<>();
+    queryParams.put(TodoController.STATUS_KEY, Arrays.asList(new String[] {invalidStatus}));
+    when(ctx.queryParamMap()).thenReturn(queryParams);
+    when(ctx.queryParam(TodoController.STATUS_KEY)).thenReturn(invalidStatus);
+
+    Throwable exception = assertThrows(BadRequestResponse.class, () -> {
+      todoController.getTodos(ctx);
+    });
+
+    assertEquals("The status filter must be either 'complete' or 'incomplete'", exception.getMessage());
   }
 
   // Test for getting todos by body content
   @Test
   void canGetTodosByBodyContent() throws IOException {
     String targetPhrase = "games";
-    String targetPhraseParam = "contains";
 
     Map<String, List<String>> queryParams = new HashMap<>();
 
@@ -300,9 +375,10 @@ class TodoControllerSpec {
         .thenReturn(validator);
 
     todoController.getTodos(ctx);
-
+    // Confirm that the code being tested calls `ctx.json(…)`, and capture whatever
+    // is passed in as the argument when `ctx.json()` is called.
     verify(ctx).json(todoArrayListCaptor.capture());
-
+    // Confirm that the code under test calls `ctx.status(HttpStatus.OK)` is called.
     verify(ctx).status(HttpStatus.OK);
 
     // Confirm that we get back two todos.
