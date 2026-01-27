@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 //import static org.junit.jupiter.api.Assertions.assertNotEquals;
 //import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-//import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 //import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
@@ -20,7 +20,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-//import java.util.stream.Collectors;
+import java.util.stream.Collectors;
 
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -227,13 +227,13 @@ class TodoControllerSpec {
    *
    * @throws IOException
    */
-  /*
+
   @Test
   void canGetTodosWithStatusTrue() throws IOException {
     // We'll need both `String` and `Boolean` representations of
     // the target status
     Boolean targetStatus = false;
-    String targetStatusString = targetStatus.toString();
+    String targetStatusString = "incomplete";
 
     // Create a `Map` for the `queryParams` that will "return" the string
     // "true" if you ask for the value associated with the `STATUS_KEY`.
@@ -266,7 +266,7 @@ class TodoControllerSpec {
     verify(ctx).status(HttpStatus.OK);
 
     // Confirm that we get back two todos.
-    assertEquals(1, todoArrayListCaptor.getValue().size());
+    assertEquals(2, todoArrayListCaptor.getValue().size());
     // Confirm that both todos have status true.
     for (Todo todo : todoArrayListCaptor.getValue()) {
       assertEquals(targetStatus, todo.status);
@@ -274,9 +274,9 @@ class TodoControllerSpec {
     // Generate a list of the owners of the returned todos.
     List<String> owners = todoArrayListCaptor.getValue().stream().map(todo -> todo.owner).collect(Collectors.toList());
     // Confirm that the returned `owners` contain the two names of the true todos
-    assertTrue(owners.contains("Chris"));
+    assertTrue(owners.contains("Pat"));
   }
-  */
+
 
   // Make sure we can get todos by owner
   @Test
