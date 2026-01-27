@@ -59,6 +59,6 @@ public class Todo {
   // the better bet.
   @Override
   public String toString() {
-    return owner;
+    return "Owner: " + owner + ". Status: " + status + ". Body: " + body + ". Category: " + category;
   }
 }
