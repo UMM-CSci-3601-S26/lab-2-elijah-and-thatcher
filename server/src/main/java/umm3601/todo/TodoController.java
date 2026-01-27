@@ -40,7 +40,7 @@ public class TodoController implements Controller {
   private static final String API_TODOS_BY_ID = "/api/todos/{id}";
   static final String OWNER_KEY = "owner";
   static final String STATUS_KEY = "status";
-  static final String BODY_KEY = "body";
+  static final String BODY_KEY = "contains";
   static final String CATEGORY_KEY = "category";
 
   private static final String STATUS_REGEX = "^(complete|incomplete)$";
@@ -152,6 +152,12 @@ public class TodoController implements Controller {
         throw new BadRequestResponse("The status filter must be either 'complete' or 'incomplete'");
       }
       filters.add(eq(STATUS_KEY, statusFilter));
+    }
+
+    // Filter by body
+    if (ctx.queryParamMap().containsKey(BODY_KEY)) {
+      Pattern pattern = Pattern.compile(Pattern.quote(ctx.queryParam(BODY_KEY)), Pattern.CASE_INSENSITIVE);
+      filters.add(regex("body", pattern));
     }
 
     // Combine the list of filters into a single filtering document.

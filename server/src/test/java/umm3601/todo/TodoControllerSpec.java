@@ -55,6 +55,7 @@ import io.javalin.validation.Validation;
 //import io.javalin.validation.ValidationError;
 //import io.javalin.validation.ValidationException;
 import io.javalin.validation.Validator;
+//import umm3601.user.UserController;
 
 /**
  * Tests the logic of the TodoController
@@ -277,6 +278,44 @@ class TodoControllerSpec {
     assertTrue(owners.contains("Pat"));
   }
 
+  // Test for getting todos by body content
+  @Test
+  void canGetTodosByBodyContent() throws IOException {
+    String targetPhrase = "games";
+    String targetPhraseParam = "contains";
+
+    Map<String, List<String>> queryParams = new HashMap<>();
+
+    queryParams.put(TodoController.BODY_KEY, Arrays.asList(new String[] {targetPhrase}));
+
+    when(ctx.queryParamMap()).thenReturn(queryParams);
+
+    when(ctx.queryParam(TodoController.BODY_KEY)).thenReturn(targetPhrase);
+
+    Validation validation = new Validation();
+
+    Validator<String> validator = validation.validator(TodoController.BODY_KEY, String.class, targetPhrase);
+
+    when(ctx.queryParamAsClass(TodoController.BODY_KEY, String.class))
+        .thenReturn(validator);
+
+    todoController.getTodos(ctx);
+
+    verify(ctx).json(todoArrayListCaptor.capture());
+
+    verify(ctx).status(HttpStatus.OK);
+
+    // Confirm that we get back two todos.
+    assertEquals(2, todoArrayListCaptor.getValue().size());
+    // Confirm that both todos have a body with "games" in it.
+    for (Todo todo : todoArrayListCaptor.getValue()) {
+      assertEquals(true, todo.body.contains("games"));
+    }
+    // Generate a list of the owners of the returned todos.
+    List<String> owners = todoArrayListCaptor.getValue().stream().map(todo -> todo.owner).collect(Collectors.toList());
+    // Confirm that the returned `owners` are both "Chris"
+    assertTrue(owners.contains("Chris"));
+  }
 
   // Make sure we can get todos by owner
   @Test
@@ -577,303 +616,4 @@ class TodoControllerSpec {
   }
   */
 
-  /*
-  @Test
-  void addTodo() throws IOException {
-    // Create a new todo to add
-    Todo newTodo = new Todo();
-    newTodo.name = "Test Todo";
-    newTodo.age = 25;
-    newTodo.company = "testers";
-    newTodo.email = "test@example.com";
-    newTodo.role = "viewer";
-
-    // Use `javalinJackson` to convert the `Todo` object to a JSON string representing that todo.
-    // This would be equivalent to:
-    //   String testNewTodo = """
-    //       {
-    //         "name": "Test Todo",
-    //         "age": 25,
-    //         "company": "testers",
-    //         "email": "test@example.com",
-    //         "role": "viewer"
-    //       }
-    //       """;
-    // but using `javalinJackson` to generate the JSON avoids repeating all the field values,
-    // which is then less error prone.
-    String newTodoJson = javalinJackson.toJsonString(newTodo, Todo.class);
-
-    // A `BodyValidator` needs
-    //   - The string (`newTodoJson`) being validated
-    //   - The class (`Todo.class) it's trying to generate from that string
-    //   - A function (`() -> Todo`) which "shows" the validator how to convert
-    //     the JSON string to a `Todo` object. We'll again use `javalinJackson`,
-    //     but in the other direction.
-    when(ctx.bodyValidator(Todo.class))
-      .thenReturn(new BodyValidator<Todo>(newTodoJson, Todo.class,
-                    () -> javalinJackson.fromJsonString(newTodoJson, Todo.class)));
-
-    todoController.addNewTodo(ctx);
-    verify(ctx).json(mapCaptor.capture());
-
-    // Our status should be 201, i.e., our new todo was successfully created.
-    verify(ctx).status(HttpStatus.CREATED);
-
-    // Verify that the todo was added to the database with the correct ID
-    Document addedTodo = db.getCollection("todos")
-        .find(eq("_id", new ObjectId(mapCaptor.getValue().get("id")))).first();
-
-    // Successfully adding the todo should return the newly generated, non-empty
-    // MongoDB ID for that todo.
-    assertNotEquals("", addedTodo.get("_id"));
-    // The new todo in the database (`addedTodo`) should have the same
-    // field values as the todo we asked it to add (`newTodo`).
-    assertEquals(newTodo.name, addedTodo.get("name"));
-    assertEquals(newTodo.age, addedTodo.get(TodoController.AGE_KEY));
-    assertEquals(newTodo.company, addedTodo.get(TodoController.COMPANY_KEY));
-    assertEquals(newTodo.email, addedTodo.get("email"));
-    assertEquals(newTodo.role, addedTodo.get(TodoController.ROLE_KEY));
-    assertNotNull(addedTodo.get("avatar"));
-  }
-
-  @Test
-  void addInvalidEmailTodo() throws IOException {
-    // Create a new todo JSON string to add.
-    // Note that it has an invalid string for the email address, which is
-    // why we're using a `String` here instead of a `Todo` object
-    // like we did in the previous tests.
-    String newTodoJson = """
-      {
-        "name": "Test Todo",
-        "age": 25,
-        "company": "testers",
-        "email": "invalidemail",
-        "role": "viewer"
-      }
-      """;
-
-    when(ctx.body()).thenReturn(newTodoJson);
-    when(ctx.bodyValidator(Todo.class))
-      .thenReturn(new BodyValidator<Todo>(newTodoJson, Todo.class,
-                    () -> javalinJackson.fromJsonString(newTodoJson, Todo.class)));
-
-    // This should now throw a `ValidationException` because
-    // the JSON for our new todo has an invalid email address.
-    ValidationException exception = assertThrows(ValidationException.class, () -> {
-      todoController.addNewTodo(ctx);
-    });
-
-    // This `ValidationException` was caused by a custom check, so we just get the message from the first
-    // error (which is a `"REQUEST_BODY"` error) and convert that to a string with `toString()`. This gives
-    // a `String` that has all the details of the exception, which we can make sure contains information
-    // that would help a developer sort out validation errors.
-    String exceptionMessage = exception.getErrors().get("REQUEST_BODY").get(0).toString();
-
-    // The message should be the message from our code under test, which should also include the text
-    // we tried to parse as an email, namely "invalidemail".
-    assertTrue(exceptionMessage.contains("invalidemail"));
-  }
-
-  @Test
-  void addTodoWithoutName() throws IOException {
-    String newTodoJson = """
-        {
-          "age": 25,
-          "company": "testers",
-          "email": "test@example.com",
-          "role": "viewer"
-        }
-        """;
-
-    when(ctx.body()).thenReturn(newTodoJson);
-    when(ctx.bodyValidator(Todo.class))
-        .then(value -> new BodyValidator<Todo>(newTodoJson, Todo.class,
-                        () -> javalinJackson.fromJsonString(newTodoJson, Todo.class)));
-
-    // This should now throw a `ValidationException` because
-    // the JSON for our new todo has no name.
-    ValidationException exception = assertThrows(ValidationException.class, () -> {
-      todoController.addNewTodo(ctx);
-    });
-    // This `ValidationException` was caused by a custom check, so we just get the message from the first
-    // error (which is a `"REQUEST_BODY"` error) and convert that to a string with `toString()`. This gives
-    // a `String` that has all the details of the exception, which we can make sure contains information
-    // that would help a developer sort out validation errors.
-    String exceptionMessage = exception.getErrors().get("REQUEST_BODY").get(0).toString();
-
-    // The message should be the message from our code under test, which should also include some text
-    // indicating that there was a missing todo name.
-    assertTrue(exceptionMessage.contains("non-empty todo name"));
-  }
-
-  @Test
-  void addEmptyNameTodo() throws IOException {
-    String newTodoJson = """
-        {
-          "name": "",
-          "age": 25,
-          "company": "testers",
-          "email": "test@example.com",
-          "role": "viewer"
-        }
-        """;
-
-    when(ctx.body()).thenReturn(newTodoJson);
-    when(ctx.bodyValidator(Todo.class))
-        .then(value -> new BodyValidator<Todo>(newTodoJson, Todo.class,
-                        () -> javalinJackson.fromJsonString(newTodoJson, Todo.class)));
-
-    // This should now throw a `ValidationException` because
-    // the JSON for our new todo has an invalid email address.
-    ValidationException exception = assertThrows(ValidationException.class, () -> {
-      todoController.addNewTodo(ctx);
-    });
-    // This `ValidationException` was caused by a custom check, so we just get the message from the first
-    // error (which is a `"REQUEST_BODY"` error) and convert that to a string with `toString()`. This gives
-    // a `String` that has all the details of the exception, which we can make sure contains information
-    // that would help a developer sort out validation errors.
-    String exceptionMessage = exception.getErrors().get("REQUEST_BODY").get(0).toString();
-
-    // The message should be the message from our code under test, which should also include some text
-    // indicating that there was an empty string for the todo name.
-    assertTrue(exceptionMessage.contains("non-empty todo name"));
-  }
-
-  @Test
-  void addInvalidRoleTodo() throws IOException {
-    String newTodoJson = """
-        {
-          "name": "Test Todo",
-          "age": 25,
-          "company": "testers",
-          "email": "test@example.com",
-          "role": "invalidrole"
-        }
-        """;
-
-    when(ctx.body()).thenReturn(newTodoJson);
-    when(ctx.bodyValidator(Todo.class))
-        .then(value -> new BodyValidator<Todo>(newTodoJson, Todo.class,
-                        () -> javalinJackson.fromJsonString(newTodoJson, Todo.class)));
-
-    // This should now throw a `ValidationException` because
-    // the JSON for our new todo has an invalid todo role.
-    ValidationException exception = assertThrows(ValidationException.class, () -> {
-      todoController.addNewTodo(ctx);
-    });
-    // This `ValidationException` was caused by a custom check, so we just get the message from the first
-    // error (which is a `"REQUEST_BODY"` error) and convert that to a string with `toString()`. This gives
-    // a `String` that has all the details of the exception, which we can make sure contains information
-    // that would help a developer sort out validation errors.
-    String exceptionMessage = exception.getErrors().get("REQUEST_BODY").get(0).toString();
-
-    // The message should be the message from our code under test, which should also include the text
-    // we tried to use as a role, namely "invalidrole".
-    assertTrue(exceptionMessage.contains("invalidrole"));
-  }
-
-  @Test
-  void addTodoWithoutCompany() throws IOException {
-    String newTodoJson = """
-        {
-          "name": "Test Todo",
-          "age": 25,
-          "email": "test@example.com",
-          "role": "viewer"
-        }
-        """;
-
-    when(ctx.body()).thenReturn(newTodoJson);
-    when(ctx.bodyValidator(Todo.class))
-        .then(value -> new BodyValidator<Todo>(newTodoJson, Todo.class,
-                        () -> javalinJackson.fromJsonString(newTodoJson, Todo.class)));
-
-    // This should now throw a `ValidationException` because
-    // the JSON for our new todo has no company.
-    ValidationException exception = assertThrows(ValidationException.class, () -> {
-      todoController.addNewTodo(ctx);
-    });
-    // This `ValidationException` was caused by a custom check, so we just get the message from the first
-    // error (which is a `"REQUEST_BODY"` error) and convert that to a string with `toString()`. This gives
-    // a `String` that has all the details of the exception, which we can make sure contains information
-    // that would help a developer sort out validation errors.
-    String exceptionMessage = exception.getErrors().get("REQUEST_BODY").get(0).toString();
-
-    // The message should be the message from our code under test, which should also include some text
-    // indicating that there was a missing company name.
-    assertTrue(exceptionMessage.contains("non-empty company name"));
-  }
-
-  @Test
-  void addTodoWithNeitherCompanyNorName() throws IOException {
-    String newTodoJson = """
-        {
-          "name": "",
-          "age": 25,
-          "company": "",
-          "email": "test@example.com",
-          "role": "viewer"
-        }
-        """;
-
-    when(ctx.body()).thenReturn(newTodoJson);
-    when(ctx.bodyValidator(Todo.class))
-        .then(value -> new BodyValidator<Todo>(newTodoJson, Todo.class,
-                        () -> javalinJackson.fromJsonString(newTodoJson, Todo.class)));
-
-    // This should now throw a `ValidationException` because
-    // the JSON for our new todo has an invalid email address.
-    ValidationException exception = assertThrows(ValidationException.class, () -> {
-      todoController.addNewTodo(ctx);
-    });
-    // We should have _two_ errors here both of type `REQUEST_BODY`. The first should be for the
-    // missing name and the second for the missing company.
-    List<ValidationError<Object>> errors = exception.getErrors().get("REQUEST_BODY");
-
-    // Check the todo name error
-    // It's a little fragile to have the tests assume the todo error is first and the
-    // company error is second.
-    String nameExceptionMessage = errors.get(0).toString();
-    assertTrue(nameExceptionMessage.contains("non-empty todo name"));
-
-    // Check the company name error
-    String companyExceptionMessage = errors.get(1).toString();
-    assertTrue(companyExceptionMessage.contains("non-empty company name"));
-  }
-
-  @Test
-  void deleteFoundTodo() throws IOException {
-    String testID = samsId.toHexString();
-    when(ctx.pathParam("id")).thenReturn(testID);
-
-    // Todo exists before deletion
-    assertEquals(1, db.getCollection("todos").countDocuments(eq("_id", new ObjectId(testID))));
-
-    todoController.deleteTodo(ctx);
-
-    verify(ctx).status(HttpStatus.OK);
-
-    // Todo is no longer in the database
-    assertEquals(0, db.getCollection("todos").countDocuments(eq("_id", new ObjectId(testID))));
-  }
-
-  @Test
-  void tryToDeleteNotFoundTodo() throws IOException {
-    String testID = samsId.toHexString();
-    when(ctx.pathParam("id")).thenReturn(testID);
-
-    todoController.deleteTodo(ctx);
-    // Todo is no longer in the database
-    assertEquals(0, db.getCollection("todos").countDocuments(eq("_id", new ObjectId(testID))));
-
-    assertThrows(NotFoundResponse.class, () -> {
-      todoController.deleteTodo(ctx);
-    });
-
-    verify(ctx).status(HttpStatus.NOT_FOUND);
-
-    // Todo is still not in the database
-    assertEquals(0, db.getCollection("todos").countDocuments(eq("_id", new ObjectId(testID))));
-  }
-*/
 }
