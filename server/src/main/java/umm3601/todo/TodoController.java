@@ -43,6 +43,8 @@ public class TodoController implements Controller {
   static final String BODY_KEY = "body";
   static final String CATEGORY_KEY = "category";
 
+  private static final String STATUS_REGEX = "^(complete|incomplete)$";
+
   private final JacksonMongoCollection<Todo> todosCollection;
 
   /**
@@ -136,6 +138,20 @@ public class TodoController implements Controller {
     if (ctx.queryParamMap().containsKey(CATEGORY_KEY)) {
       Pattern pattern = Pattern.compile(Pattern.quote(ctx.queryParam(CATEGORY_KEY)), Pattern.CASE_INSENSITIVE);
       filters.add(regex(CATEGORY_KEY, pattern));
+    }
+
+    // Filter by status
+    if (ctx.queryParamMap().containsKey(STATUS_KEY)) {
+      String statusParam = ctx.queryParam(STATUS_KEY);
+      Boolean statusFilter = null;
+      if ("complete".equals(statusParam)) {
+        statusFilter = true;
+      } else if ("incomplete".equals(statusParam)) {
+        statusFilter = false;
+      } else {
+        throw new BadRequestResponse("The status filter must be either 'complete' or 'incomplete'");
+      }
+      filters.add(eq(STATUS_KEY, statusFilter));
     }
 
     // Combine the list of filters into a single filtering document.
