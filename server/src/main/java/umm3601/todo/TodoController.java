@@ -40,7 +40,7 @@ public class TodoController implements Controller {
   private static final String API_TODOS_BY_ID = "/api/todos/{id}";
   static final String OWNER_KEY = "owner";
   static final String STATUS_KEY = "status";
-  static final String BODY_KEY = "body";
+  static final String BODY_KEY = "contains";
   static final String CATEGORY_KEY = "category";
 
   private static final String STATUS_REGEX = "^(complete|incomplete)$";
@@ -154,6 +154,12 @@ public class TodoController implements Controller {
       filters.add(eq(STATUS_KEY, statusFilter));
     }
 
+    // Filter by body
+    if (ctx.queryParamMap().containsKey(BODY_KEY)) {
+      Pattern pattern = Pattern.compile(Pattern.quote(ctx.queryParam(BODY_KEY)), Pattern.CASE_INSENSITIVE);
+      filters.add(regex("body", pattern));
+    }
+
     // Combine the list of filters into a single filtering document.
     Bson combinedFilter = filters.isEmpty() ? new Document() : and(filters);
 
@@ -168,12 +174,12 @@ public class TodoController implements Controller {
    *  to sort the database collection of todos
    */
   private Bson constructSortingOrder(Context ctx) {
-    // Sort the results. Use the `sortby` query param (default "category")
+    // Sort the results. Use the `orderBy` query param (default "category")
     // as the field to sort by, and the query param `sortorder` (default
     // "asc") to specify the sort order.
-    String sortBy = Objects.requireNonNullElse(ctx.queryParam("sortby"), "category");
+    String orderBy = Objects.requireNonNullElse(ctx.queryParam("orderBy"), "category");
     String sortOrder = Objects.requireNonNullElse(ctx.queryParam("sortorder"), "asc");
-    Bson sortingOrder = sortOrder.equals("desc") ?  Sorts.descending(sortBy) : Sorts.ascending(sortBy);
+    Bson sortingOrder = sortOrder.equals("desc") ?  Sorts.descending(orderBy) : Sorts.ascending(orderBy);
     return sortingOrder;
   }
 
@@ -285,7 +291,7 @@ public class TodoController implements Controller {
     // List todos, filtered using query parameters
     server.get(API_TODOS, this::getTodos);
 
-    // List todos, filtered by owner/category
+    // List todos, grouped by owner/category
     server.get("/api/todosByOwner", this::getTodosGroupedByOwner);
     server.get("/api/todosByCategory", this::getTodosGroupedByCategory);
 
