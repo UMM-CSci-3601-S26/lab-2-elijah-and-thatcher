@@ -4,12 +4,8 @@ import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Filters.regex;
 
-//import java.nio.charset.StandardCharsets;
-//import java.security.MessageDigest;
-//import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
-//import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -20,9 +16,7 @@ import org.bson.types.ObjectId;
 import org.mongojack.JacksonMongoCollection;
 
 import com.mongodb.client.MongoDatabase;
-//import com.mongodb.client.MongoIterable;
 import com.mongodb.client.model.Sorts;
-//import com.mongodb.client.result.DeleteResult;
 
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
@@ -42,8 +36,7 @@ public class TodoController implements Controller {
   static final String STATUS_KEY = "status";
   static final String BODY_KEY = "contains";
   static final String CATEGORY_KEY = "category";
-
-  private static final String STATUS_REGEX = "^(complete|incomplete)$";
+  static final String LIMIT_KEY = "limit";
 
   private final JacksonMongoCollection<Todo> todosCollection;
 
@@ -93,15 +86,31 @@ public class TodoController implements Controller {
     Bson combinedFilter = constructFilter(ctx);
     Bson sortingOrder = constructSortingOrder(ctx);
 
+    // Get limit amount, keep 0 otherwise
+    int targetLimit = 0;
+    if (ctx.queryParamMap().containsKey(LIMIT_KEY)) {
+      targetLimit = ctx.queryParamAsClass(LIMIT_KEY, Integer.class)
+        .check(it -> it > 0, "Todo's limit must be greater than zero; you provided " + ctx.queryParam(LIMIT_KEY))
+        .get();
+    }
+
     // All three of the find, sort, and into steps happen "in parallel" inside the
     // database system. So MongoDB is going to find the todos with the specified
     // properties, return those sorted in the specified manner, and put the
     // results into an initially empty ArrayList.
-    ArrayList<Todo> matchingTodos = todosCollection
-      .find(combinedFilter)
-      .sort(sortingOrder)
-      .into(new ArrayList<>());
-
+    ArrayList<Todo> matchingTodos;
+    if (targetLimit > 0) {
+      matchingTodos = todosCollection
+        .find(combinedFilter)
+        .sort(sortingOrder)
+        .limit(targetLimit)
+        .into(new ArrayList<>());
+    } else {
+      matchingTodos = todosCollection
+        .find(combinedFilter)
+        .sort(sortingOrder)
+        .into(new ArrayList<>());
+    }
 
     // Set the JSON body of the response to be the list of todos returned by the database.
     // According to the Javalin documentation (https://javalin.io/documentation#context),
@@ -270,9 +279,9 @@ public class TodoController implements Controller {
    * These endpoints are:
    *   - `GET /api/todos/:id`
    *       - Get the specified todo
-   *   - `GET /api/todos?age=NUMBER&company=STRING&name=STRING`
+   *   - `GET /api/todos?owner=STRING&category=STRING&status=STRING`
    *      - List todos, filtered using query parameters
-   *      - `owner`, `category`, and `status` are optional query parameters
+   *      - `owner`, `category`, and `status` are optional query parameters for example
    *   - `GET /api/todosByCategory` / `GET /api/todosByOwner`
    *     - Get todo owners and IDs, possibly filtered, grouped by category/owner
    *   - `DELETE /api/todos/:id`

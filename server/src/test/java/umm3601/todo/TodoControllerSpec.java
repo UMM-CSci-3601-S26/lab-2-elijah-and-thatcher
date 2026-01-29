@@ -1,19 +1,18 @@
 package umm3601.todo;
 
-//import static com.mongodb.client.model.Filters.eq;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
-//import static org.junit.jupiter.api.Assertions.assertNotEquals;
-//import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-//import static org.mockito.ArgumentMatchers.argThat;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-//import java.security.NoSuchAlgorithmException;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -29,14 +28,12 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-//import org.mockito.ArgumentMatcher;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
-//import com.fasterxml.jackson.core.JsonProcessingException;
-//import com.fasterxml.jackson.databind.JsonMappingException;
+
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ServerAddress;
 import com.mongodb.client.MongoClient;
@@ -50,12 +47,13 @@ import io.javalin.http.Context;
 import io.javalin.http.HttpStatus;
 import io.javalin.http.NotFoundResponse;
 import io.javalin.json.JavalinJackson;
-//import io.javalin.validation.BodyValidator;
+
 import io.javalin.validation.Validation;
-//import io.javalin.validation.ValidationError;
-//import io.javalin.validation.ValidationException;
+import io.javalin.validation.ValidationException;
+
 import io.javalin.validation.Validator;
-//import umm3601.user.UserController;
+
+
 
 /**
  * Tests the logic of the TodoController
@@ -654,6 +652,91 @@ class TodoControllerSpec {
     assertEquals("video games", videoGames._id);
     assertEquals(2, videoGames.count);
   }
+
+  // Test that improper limits are good
+  @Test
+  void respondsToTooSmallOfLimit() {
+    Map<String, List<String>> queryParams = new HashMap<>();
+    String negativeLimitString = "-1";
+    queryParams.put(TodoController.LIMIT_KEY, Arrays.asList(new String[] {negativeLimitString}));
+    when(ctx.queryParamMap()).thenReturn(queryParams);
+    // When the code being tested calls `ctx.queryParam(LIMIT_KEY)` return the
+    // `negativeLimitString`.
+    when(ctx.queryParam(TodoController.LIMIT_KEY)).thenReturn(negativeLimitString);
+
+    // Create a validator that confirms that when we ask for the value associated with
+    // `LIMIT_KEY` _as an integer_, we get back the string value `negativeLimitString`.
+    Validation validation = new Validation();
+    // The `LIMIT_KEY` should be name of the key whose value is being validated.
+    Validator<Integer> validator = validation.validator(TodoController.LIMIT_KEY, Integer.class, negativeLimitString);
+    when(ctx.queryParamAsClass(TodoController.LIMIT_KEY, Integer.class)).thenReturn(validator);
+
+    // This should now throw a `ValidationException` because
+    // our request has an limit that is not greater than 0.
+    ValidationException exception = assertThrows(ValidationException.class, () -> {
+      todoController.getTodos(ctx);
+    });
+    // This `ValidationException` was caused by a custom check, so we just get the message from the first
+    // error and confirm that it contains the problematic string, since that would be useful information
+    // for someone trying to debug a case where this validation fails.
+    String exceptionMessage = exception.getErrors().get(TodoController.LIMIT_KEY).get(0).getMessage();
+    // The message should be the message from our code under test, which should include the text we
+    // tried to parse as an limit, namely "-1".
+    assertTrue(exceptionMessage.contains(negativeLimitString));
+  }
+
+  // Test that regular limits are good
+  @Test
+  void canGetLimitedTodos() throws IOException {
+    // We'll need both `String` and `Integer` representations of
+    // the target limit.
+    Integer targetLimit = 3;
+    String targetLimitString = targetLimit.toString();
+
+    // Create a `Map` for the `queryParams` that will "return" the string
+    // "3" if you ask for the value associated with the `LIMIT_KEY`.
+    Map<String, List<String>> queryParams = new HashMap<>();
+
+    queryParams.put(TodoController.LIMIT_KEY, Arrays.asList(new String[] {targetLimitString}));
+    // When the code being tested calls `ctx.queryParamMap()` return the
+    // the `queryParams` map we just built.
+    when(ctx.queryParamMap()).thenReturn(queryParams);
+    // When the code being tested calls `ctx.queryParam(LIMIT_KEY)` return the
+    // `targetLimitString`.
+    when(ctx.queryParam(TodoController.LIMIT_KEY)).thenReturn(targetLimitString);
+
+    // Create a validator that confirms that when we ask for the value associated with
+    // `LIMIT_KEY` _as an integer_, we get back the integer value 3.
+    Validation validation = new Validation();
+    // The `LIMIT_KEY` should be name of the key whose value is being validated.
+    // You can actually put whatever you want here, because it's only used in the generation
+    // of testing error reports, but using the actually key value will make those reports more informative.
+    Validator<Integer> validator = validation.validator(TodoController.LIMIT_KEY, Integer.class, targetLimitString);
+    // When the code being tested calls `ctx.queryParamAsClass("limit", Integer.class)`
+    // we'll return the `Validator` we just constructed.
+    when(ctx.queryParamAsClass(TodoController.LIMIT_KEY, Integer.class))
+        .thenReturn(validator);
+
+    todoController.getTodos(ctx);
+
+    // Confirm that the code being tested calls `ctx.json(…)`, and capture whatever
+    // is passed in as the argument when `ctx.json()` is called.
+    verify(ctx).json(todoArrayListCaptor.capture());
+    // Confirm that the code under test calls `ctx.status(HttpStatus.OK)` is called.
+    verify(ctx).status(HttpStatus.OK);
+
+    // Confirm that we get back three todos.
+    assertEquals(3, todoArrayListCaptor.getValue().size());
+  }
+
+
+
+
+
+
+
+
+
   /* Test fails on GitHub, commented out to ensure PR can be merged
   * Test does pass locally
   @Test
