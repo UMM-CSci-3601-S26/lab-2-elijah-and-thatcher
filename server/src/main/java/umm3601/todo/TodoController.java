@@ -174,12 +174,12 @@ public class TodoController implements Controller {
    *  to sort the database collection of todos
    */
   private Bson constructSortingOrder(Context ctx) {
-    // Sort the results. Use the `sortby` query param (default "category")
+    // Sort the results. Use the `orderBy` query param (default "category")
     // as the field to sort by, and the query param `sortorder` (default
     // "asc") to specify the sort order.
-    String sortBy = Objects.requireNonNullElse(ctx.queryParam("sortby"), "category");
+    String orderBy = Objects.requireNonNullElse(ctx.queryParam("orderBy"), "category");
     String sortOrder = Objects.requireNonNullElse(ctx.queryParam("sortorder"), "asc");
-    Bson sortingOrder = sortOrder.equals("desc") ?  Sorts.descending(sortBy) : Sorts.ascending(sortBy);
+    Bson sortingOrder = sortOrder.equals("desc") ?  Sorts.descending(orderBy) : Sorts.ascending(orderBy);
     return sortingOrder;
   }
 
@@ -291,7 +291,7 @@ public class TodoController implements Controller {
     // List todos, filtered using query parameters
     server.get(API_TODOS, this::getTodos);
 
-    // List todos, filtered by owner/category
+    // List todos, grouped by owner/category
     server.get("/api/todosByOwner", this::getTodosGroupedByOwner);
     server.get("/api/todosByCategory", this::getTodosGroupedByCategory);
 
